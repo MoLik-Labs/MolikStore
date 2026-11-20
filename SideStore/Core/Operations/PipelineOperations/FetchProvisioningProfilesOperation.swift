@@ -27,7 +27,10 @@ class FetchProvisioningProfilesOperation: BasePipelineOperation<InstallAppOperat
 
         guard let targetAppBundle = self.context.targetAppBundle else {
             self.debugLog("[FetchProvisioningProfiles] Target app bundle missing in context.")
-            throw OperationError.invalidParameters("FetchProvisioningProfilesOperation: context.targetAppBundle is nil")
+            // The installed app's files are no longer on disk (e.g. iOS removed the container or the
+            // app was deleted outside of SideStore) even though its database record still exists.
+            // Surface an actionable message instead of a cryptic nil-context error.
+            throw OperationError.invalidParameters("FetchProvisioningProfilesOperation: context.targetAppBundle is nil. The app's installed files appear to be missing — remove the app from My Apps and re-add it, or reinstall it from its source.")
         }
 
         let effectiveBundleId = self.context.targetBundleIdentifier

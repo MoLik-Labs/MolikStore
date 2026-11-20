@@ -74,15 +74,33 @@ final class RefreshAppOperation: BasePipelineOperation<InstallAppOperationContex
               let installedApp = dbContext.object(with: mainApp.objectID) as? InstalledApp else {
             throw OperationError.invalidParameters("Could not find installed database record for '\(appBundle.name)'")
         }
-        installedApp.update(provisioningProfile: profiles.values.first!)
+
+        // Use the main app's own provisioning profile, keyed by its (re)signed bundle identifier,
+        // rather than profiles.values.first! — for apps with extensions that dict's first value can be
+        // an extension's profile (which may carry a different expiration date) and would corrupt the
+        // main app's recorded expiry.
+        let mainProfile = profiles[installedApp.resignedBundleIdentifier]
+            ?? profiles[self.context.targetBundleIdentifier]
+            ?? profiles.values.first
+        guard let mainProfile else {
+            throw OperationError.invalidParameters("RefreshAppOperation: could not locate main provisioning profile for '\(installedApp.resignedBundleIdentifier)'")
+        }
+        installedApp.update(provisioningProfile: mainProfile)
         
         if let certStatus = self.context.targetCertStatus {
             installedApp.certificateStatus = certStatus
         }
 
         for installedExtension in installedApp.appExtensions {
-            guard let provisioningProfile = profiles[installedExtension.bundleIdentifier] else { continue }
-            installedExtension.update(provisioningProfile: provisioningProfile)
+            // Extension profiles are keyed by the *re-signed* (effective) bundle identifier, not the
+            // original one, so look that up first. Fall back to the original ID, then to the main app's
+            // profile (e.g. when a single profile is shared across all extensions via useMainProfile).
+            // Previously this lookup used the original ID and `continue`d on miss, leaving every
+            // extension's refreshedDate/expirationDate stale after a refresh.
+            let extensionProfile = profiles[installedExtension.resignedBundleIdentifier]
+                ?? profiles[installedExtension.bundleIdentifier]
+                ?? mainProfile
+            installedExtension.update(provisioningProfile: extensionProfile)
         }
         return installedApp
     }

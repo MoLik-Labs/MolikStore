@@ -310,7 +310,13 @@ public extension InstalledApp
     
     func update(provisioningProfile: ALTProvisioningProfile)
     {
-        self.refreshedDate = provisioningProfile.creationDate
+        // NOTE: A provisioning profile's `creationDate` is when Apple *first issued* the profile for
+        // this App ID (often days or weeks before the current operation), not when we last signed the
+        // app. Recording that stale date as `refreshedDate` caused the "expires in 0 days" /
+        // "no longer available" desync and also broke the background-refresh throttle
+        // (fetchAppsForBackgroundRefresh compares refreshedDate against a 6-hour window). The actual
+        // refresh moment is now, so we use Date() and keep the profile's real expiration date.
+        self.refreshedDate = Date()
         self.expirationDate = provisioningProfile.expirationDate
     }
     

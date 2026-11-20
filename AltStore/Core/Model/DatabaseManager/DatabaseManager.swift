@@ -418,8 +418,15 @@ public class DatabaseManager: @unchecked Sendable
         installedApp.certificateStatus = status
         
         if let provisioningProfile = localAppBundle.provisioningProfile {
-            installedApp.refreshedDate = provisioningProfile.creationDate
-            installedApp.expirationDate = provisioningProfile.expirationDate
+            // The embedded profile belongs to the *currently installed* binary. Only adopt its dates
+            // when it is genuinely newer than what we have persisted (i.e. SideStore was reinstalled or
+            // refreshed since the last database write). Otherwise a stale embedded profile would clobber
+            // a more recent refresh and produce the "expires in 0 days" / "no longer available" desync
+            // that users report even while SideStore claims 6–7 days remaining.
+            if provisioningProfile.creationDate > installedApp.refreshedDate {
+                installedApp.refreshedDate = provisioningProfile.creationDate
+                installedApp.expirationDate = provisioningProfile.expirationDate
+            }
         }
     }
     

@@ -69,7 +69,9 @@ public class InstalledExtension: BaseEntity, InstalledAppProtocol
     
     public func update(provisioningProfile: ALTProvisioningProfile)
     {
-        self.refreshedDate = provisioningProfile.creationDate
+        // See InstalledApp.update(provisioningProfile:) for why refreshedDate is Date() and not the
+        // profile's creationDate.
+        self.refreshedDate = Date()
         self.expirationDate = provisioningProfile.expirationDate
     }
     
