@@ -430,12 +430,16 @@ public extension InstalledApp
     
     class func fetchAppsForBackgroundRefresh(in context: NSManagedObjectContext) -> [InstalledApp]
     {
-        // Date 6 hours before now.
+        // Throttle window: don't re-refresh an app we already refreshed in the last 6 hours.
         let date = Date().addingTimeInterval(-1 * 6 * 60 * 60)
+        // Proactive window: refresh apps that will expire within the next 24 hours even if they were
+        // "refreshed" recently, so a free-account app never silently dies between background runs.
+        let proactiveExpiryDate = Date().addingTimeInterval(24 * 60 * 60)
         
-        let predicate = NSPredicate(format: "(%K == YES) AND (%K < %@) AND (%K != %@) AND (%K == nil OR %K == NO OR %K == YES)",
+        let predicate = NSPredicate(format: "(%K == YES) AND ((%K < %@) OR (%K < %@)) AND (%K != %@) AND (%K == nil OR %K == NO OR %K == YES)",
                                     #keyPath(InstalledApp.isActive),
                                     #keyPath(InstalledApp.refreshedDate), date as NSDate,
+                                    #keyPath(InstalledApp.expirationDate), proactiveExpiryDate as NSDate,
                                     #keyPath(InstalledApp.bundleIdentifier), StoreApp.altstoreAppID,
                                     #keyPath(InstalledApp.storeApp),
                                     #keyPath(InstalledApp.storeApp.isPledgeRequired),
@@ -446,7 +450,8 @@ public extension InstalledApp
                                              sortedBy: [NSSortDescriptor(keyPath: \InstalledApp.expirationDate, ascending: true)],
                                              in: context)
         
-        if let altStoreApp = InstalledApp.fetchAltStore(in: context), altStoreApp.refreshedDate < date
+        if let altStoreApp = InstalledApp.fetchAltStore(in: context),
+           altStoreApp.refreshedDate < date || altStoreApp.expirationDate < proactiveExpiryDate
         {
             if let storeApp = altStoreApp.storeApp
             {

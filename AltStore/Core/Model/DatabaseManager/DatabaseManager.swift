@@ -352,21 +352,10 @@ public class DatabaseManager: @unchecked Sendable
                 }
             }
             
-            let cachedRefreshedDate = installedApp.refreshedDate
-            let cachedExpirationDate = installedApp.expirationDate
-                        
             // Must go after comparing versions to see if we need to update our cached AltStore app bundle.
+            // reconcileSelfFromSelfBinary only adopts the embedded profile when it is genuinely newer than
+            // the persisted record, so no separate "revert to cached dates" guard is needed here.
             self.reconcileSelfFromSelfBinary(installedApp: installedApp, localAppBundle: localAppBundle, serialNumber: serialNumber)
-            
-            if installedApp.refreshedDate < cachedRefreshedDate
-            {
-                // Embedded provisioning profile has a creation date older than our refreshed date.
-                // This most likely means we've refreshed the app since then, and profile is now outdated,
-                // so use cached dates instead (i.e. not the dates updated from provisioning profile).
-                
-                installedApp.refreshedDate = cachedRefreshedDate
-                installedApp.expirationDate = cachedExpirationDate
-            }
             
             try context.save()
         }
