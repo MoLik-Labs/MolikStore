@@ -29,13 +29,16 @@ public struct AnisetteManager {
         
         // guard let urlString = UserDefaults.standard.customAnisetteURL, !urlString.isEmpty else { return nil }
         
-        // Test it's a valid URL
-        
+        // Test it's a valid, usable URL. URL(string:) accepts relative/garbage strings
+        // (e.g. "hello"), so also require an http(s) scheme and a host — otherwise a malformed
+        // anisette URL would slip through and fail later at request time (a contributor to
+        // "can't sign in / can't refresh" errors).
         if let urlString = urlString {
-            guard URL(string: urlString) != nil else {
-            ELOG("UserDefaults has invalid `customAnisetteURL`")
-            assertionFailure("UserDefaults has invalid `customAnisetteURL`")
-            return nil
+            guard let url = URL(string: urlString),
+                  let scheme = url.scheme, ["http", "https"].contains(scheme),
+                  url.host != nil, !urlString.trimmingCharacters(in: .whitespaces).isEmpty else {
+                ELOG("UserDefaults has invalid `customAnisetteURL`: \(urlString)")
+                return nil
             }
         }
         return urlString
